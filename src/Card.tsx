@@ -30,13 +30,25 @@ function useDragger() {
   const boundary = useRef({ minX: 0, maxX: 0, minY: 0, maxY: 0 });
   const dragStartPos = useRef({ x: 0, y: 0 });
 
-  const onMouseDown = (e: React.MouseEvent) => {
+  const interpretEvent = (
+    e: React.MouseEvent | React.TouchEvent | MouseEvent | TouchEvent
+  ) => {
+    const pos =
+      "touches" in e
+        ? { clientX: e.touches[0].clientX, clientY: e.touches[0].clientY }
+        : { clientX: e.clientX, clientY: e.clientY };
+    return pos;
+  };
+
+  const onMouseDown = (e: React.MouseEvent | React.TouchEvent) => {
     if (ref.current) {
       setIsDragging(true);
 
+      const { clientX, clientY } = interpretEvent(e);
+
       dragStartPos.current = {
-        x: e.clientX - position.x,
-        y: e.clientY - position.y,
+        x: clientX - position.x,
+        y: clientY - position.y,
       };
 
       const gutter = 10;
@@ -57,14 +69,16 @@ function useDragger() {
   useEffect(() => {
     if (!isDragging) return;
 
-    const handleMouseMove = (e: MouseEvent) => {
+    const handleMouseMove = (e: MouseEvent | TouchEvent) => {
       if (ref.current) {
+        const { clientX, clientY } = interpretEvent(e);
+
         const { minX, maxX, minY, maxY } = boundary.current;
 
-        const unboundedX = e.clientX - dragStartPos.current.x;
+        const unboundedX = clientX - dragStartPos.current.x;
         const newX = Math.max(minX, Math.min(unboundedX, maxX));
 
-        const unboundedY = e.clientY - dragStartPos.current.y;
+        const unboundedY = clientY - dragStartPos.current.y;
         const newY = Math.max(minY, Math.min(unboundedY, maxY));
 
         setPosition({ x: newX, y: newY });
@@ -76,11 +90,15 @@ function useDragger() {
     document.addEventListener("mousemove", handleMouseMove);
     document.addEventListener("mouseup", handleMouseUp);
     document.addEventListener("mouseleave", handleMouseUp);
+    document.addEventListener("touchmove", handleMouseMove);
+    document.addEventListener("touchend", handleMouseUp);
 
     return () => {
       document.removeEventListener("mousemove", handleMouseMove);
       document.removeEventListener("mouseup", handleMouseUp);
       document.removeEventListener("mouseleave", handleMouseUp);
+      document.removeEventListener("touchmove", handleMouseMove);
+      document.removeEventListener("touchend", handleMouseUp);
     };
   }, [isDragging]);
 
@@ -89,6 +107,7 @@ function useDragger() {
     elementProps: {
       ref,
       onMouseDown,
+      onTouchStart: onMouseDown,
       style: {
         transition: isDragging ? ("none" as const) : undefined,
         transform: `translate(${position.x}px, ${position.y}px)`,
